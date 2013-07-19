@@ -34,7 +34,7 @@ For the impatient::
         def get_model(self):
             return Note
 
-        def index_queryset(self):
+        def index_queryset(self, using=None):
             "Used when the entire index for model is updated."
             return self.get_model().objects.filter(pub_date__lte=datetime.datetime.now())
 
@@ -107,7 +107,7 @@ However, this can also hit the database quite heavily (think
 ``.get(pk=result.id)`` per object). If your search is popular, this can lead
 to a big performance hit. There are two ways to prevent this. The first way is
 ``SearchQuerySet.load_all``, which tries to group all similar objects and pull
-them though one query instead of many. This still hits the DB and incurs a
+them through one query instead of many. This still hits the DB and incurs a
 performance penalty.
 
 The other option is to leverage stored fields. By default, all fields in
@@ -159,7 +159,7 @@ see, the churn rate of your data and what concerns are important to you
 The conventional method is to use ``SearchIndex`` in combination with cron
 jobs. Running a ``./manage.py update_index`` every couple hours will keep your
 data in sync within that timeframe and will handle the updates in a very
-efficient batch. Additionally, Whoosh (and to a lesser extent Xapian) behave
+efficient batch. Additionally, Whoosh (and to a lesser extent Xapian) behaves
 better when using this approach.
 
 Another option is to use ``RealtimeSignalProcessor``, which uses Django's
@@ -236,7 +236,7 @@ you might write the following code::
             return "%s <%s>" % (obj.user.get_full_name(), obj.user.email)
 
 This method should return a single value (or list/tuple/dict) to populate that
-fields data upon indexing. Note that this method takes priority over whatever
+field's data upon indexing. Note that this method takes priority over whatever
 data may come from the field itself.
 
 Just like ``Form.clean_FOO``, the field's ``prepare`` runs before the
@@ -386,7 +386,7 @@ This method is required & you must override it to return the correct class.
 ``index_queryset``
 ------------------
 
-.. method:: SearchIndex.index_queryset(self)
+.. method:: SearchIndex.index_queryset(self, using=None)
 
 Get the default QuerySet to index when doing a full update.
 
@@ -395,7 +395,7 @@ Subclasses can override this method to avoid indexing certain objects.
 ``read_queryset``
 -----------------
 
-.. method:: SearchIndex.read_queryset(self)
+.. method:: SearchIndex.read_queryset(self, using=None)
 
 Get the default QuerySet for read actions.
 
@@ -526,7 +526,7 @@ with ``RelatedSearchQuerySet.load_all``. This is useful for post-processing the
 results from the query, enabling things like adding ``select_related`` or
 filtering certain data.
 
-.. warning:
+.. warning::
 
     Utilizing this functionality can have negative performance implications.
     Please see the section on ``RelatedSearchQuerySet`` within
@@ -609,7 +609,7 @@ For the impatient::
             fields = ['user', 'pub_date']
 
         # Note that regular ``SearchIndex`` methods apply.
-        def index_queryset(self):
+        def index_queryset(self, using=None):
             "Used when the entire index for model is updated."
             return Note.objects.filter(pub_date__lte=datetime.datetime.now())
 

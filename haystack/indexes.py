@@ -6,6 +6,7 @@ from django.core.exceptions import ImproperlyConfigured
 from haystack import connections, connection_router
 from haystack.constants import ID, DJANGO_CT, DJANGO_ID, Indexable, DEFAULT_ALIAS
 from haystack.fields import *
+from haystack.manager import SearchIndexManager
 from haystack.utils import get_identifier, get_facet_field_name
 
 
@@ -55,6 +56,13 @@ class DeclarativeMetaclass(type):
                             shadow_facet_field.set_instance_name(shadow_facet_name)
                             attrs['fields'][shadow_facet_name] = shadow_facet_field
 
+        # Assigning default 'objects' query manager if it does not already exist
+        if not attrs.has_key('objects'):
+            try:
+                attrs['objects'] = SearchIndexManager(attrs['Meta'].index_label)
+            except (KeyError, AttributeError):
+                attrs['objects'] = SearchIndexManager(DEFAULT_ALIAS)
+
         return super(DeclarativeMetaclass, cls).__new__(cls, name, bases, attrs)
 
 
@@ -76,7 +84,7 @@ class SearchIndex(threading.local):
             def get_model(self):
                 return Note
 
-            def index_queryset(self):
+            def index_queryset(self, using=None):
                 return self.get_model().objects.filter(pub_date__lte=datetime.datetime.now())
 
     """
@@ -102,7 +110,7 @@ class SearchIndex(threading.local):
         """
         raise NotImplementedError("You must provide a 'model' method for the '%r' index." % self)
 
-    def index_queryset(self):
+    def index_queryset(self, using=None):
         """
         Get the default QuerySet to index when doing a full update.
 
@@ -110,16 +118,16 @@ class SearchIndex(threading.local):
         """
         return self.get_model()._default_manager.all()
 
-    def read_queryset(self):
+    def read_queryset(self, using=None):
         """
         Get the default QuerySet for read actions.
 
         Subclasses can override this method to work with other managers.
         Useful when working with default managers that filter some objects.
         """
-        return self.index_queryset()
+        return self.index_queryset(using=using)
 
-    def build_queryset(self, start_date=None, end_date=None):
+    def build_queryset(self, using=None, start_date=None, end_date=None):
         """
         Get the default QuerySet to index when doing an index update.
 
@@ -154,7 +162,7 @@ class SearchIndex(threading.local):
             warnings.warn("'SearchIndex.get_queryset' was deprecated in Haystack v2. Please rename the method 'index_queryset'.")
             index_qs = self.get_queryset()
         else:
-            index_qs = self.index_queryset()
+            index_qs = self.index_queryset(using=using)
 
         if not hasattr(index_qs, 'filter'):
             raise ImproperlyConfigured("The '%r' class must return a 'QuerySet' in the 'index_queryset' method." % self)
@@ -269,7 +277,7 @@ class SearchIndex(threading.local):
         backend = self._get_backend(using)
 
         if backend is not None:
-            backend.remove(instance)
+            backend.remove(instance, **kwargs)
 
     def clear(self, using=None):
         """
